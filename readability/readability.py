@@ -37,6 +37,8 @@ REGEXES = {
 }
 
 
+VIDEO_IFRAME_SRC = ('youtube.com/embed', 'dailymotion.com/embed')
+
 class Unparseable(ValueError):
     pass
 
@@ -113,6 +115,7 @@ class Document:
         self.encoding = None
         self.positive_keywords = compile_pattern(positive_keywords)
         self.negative_keywords = compile_pattern(negative_keywords)
+        self.videos_src_pattern = compile_pattern(VIDEO_IFRAME_SRC)
 
     def _html(self, force=False):
         if force or self.html is None:
@@ -139,7 +142,7 @@ class Document:
         return shorten_title(self._html(True))
 
     def get_clean_html(self):
-         return clean_attributes(tounicode(self.html))
+         return clean_attributes(tounicode(self.html, method='html'))
 
     def summary(self, html_partial=False):
         """Generate the summary of the html docuemnt
@@ -428,11 +431,17 @@ class Document:
             if self.class_weight(header) < 0 or self.get_link_density(header) > 0.33:
                 header.drop_tree()
 
-        for elem in self.tags(node, "form", "iframe", "textarea"):
+        for elem in self.tags(node, "form", "textarea"):
             elem.drop_tree()
+        for elem in self.tags(node, "iframe"):
+            src = elem.get("src", "")
+            if not self.videos_src_pattern.search(src):
+                elem.drop_tree()
+            else:
+                self.debug('Preserving iframe: %s with src=%s' % (describe(elem), src))
         allowed = {}
         # Conditionally clean <table>s, <ul>s, and <div>s
-        for el in self.reverse_tags(node, "table", "ul", "div"):
+        for el in self.reverse_tags(node, "table", "ul", "div", "section", "footer", "header"):
             if el in allowed:
                 continue
             weight = self.class_weight(el)
@@ -449,7 +458,7 @@ class Document:
                 el.drop_tree()
             elif el.text_content().count(",") < 10:
                 counts = {}
-                for kind in ['p', 'img', 'li', 'a', 'embed', 'input']:
+                for kind in ['p', 'img', 'li', 'a', 'embed', 'input', 'iframe', 'video']:
                     counts[kind] = len(el.findall('.//%s' % kind))
                 counts["li"] -= 100
 
@@ -482,8 +491,8 @@ class Document:
                 elif counts["input"] > (counts["p"] / 3):
                     reason = "less than 3x <p>s than <input>s"
                     to_remove = True
-                elif content_length < (MIN_LEN) and (counts["img"] == 0 or counts["img"] > 2):
-                    reason = "too short content length %s without a single image" % content_length
+                elif content_length < (MIN_LEN) and (counts["img"] == 0 or counts["img"] > 2) and (counts["iframe"] == 0 or counts["iframe"] > 2) and (counts["video"] == 0):
+                    reason = "too short content length %s without a single image or video iframe or html5 video" % content_length
                     to_remove = True
                 elif weight < 25 and link_density > 0.2:
                         reason = "too many links %.3f for its weight %s" % (
