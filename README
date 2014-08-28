@@ -1,12 +1,14 @@
 This code is under the Apache License 2.0.  http://www.apache.org/licenses/LICENSE-2.0
 
-This is a python port of a ruby port of arc90's readability project
+This is a fork of a python port of a ruby port of arc90's readability project
 
 http://lab.arc90.com/experiments/readability/
 
 In few words,
 Given a html document, it pulls out the main body text and cleans it up.
 It also can clean up title based on latest readability.js code.
+Also, it keeps the YouTube/DailyMotion/HTML5 videos and knows about HTML5 tags header/footer.
+
 
 Based on:
  - Latest readability.js ( https://github.com/MHordecki/readability-redux/blob/master/readability/readability.js )
